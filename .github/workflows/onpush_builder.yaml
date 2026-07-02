@@ -382,3 +382,80 @@ jobs:
             latest
           cosign: "false"
           container-registry-password: ${{ secrets.GITHUB_TOKEN }}
+
+  publish_release:
+    if: ${{ needs.detect-changed-addons.outputs.changedAddons != '' && needs.detect-changed-addons.outputs.changedAddons != '[]' }}
+    needs: [detect-changed-addons, publish_manifest]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        addon: ${{ fromJSON(needs.detect-changed-addons.outputs.changedAddons) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install PyYAML
+        run: python3 -m pip install --disable-pip-version-check pyyaml
+
+      - name: Read release metadata
+        id: release
+        env:
+          ADDON: ${{ matrix.addon }}
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          import yaml
+
+          addon = os.environ["ADDON"]
+          addon_dir = Path(addon)
+          config = yaml.safe_load((addon_dir / "config.yaml").read_text(encoding="utf-8"))
+          version = str(config["version"]).strip()
+          name = str(config["name"]).strip()
+          changelog_path = addon_dir / "CHANGELOG.md"
+          changelog = changelog_path.read_text(encoding="utf-8") if changelog_path.exists() else ""
+
+          notes = f"{name} {version}\n"
+          pattern = re.compile(
+              rf"^##\s+{re.escape(version)}(?:\s|\(|$).*?(?=^##\s+|\Z)",
+              re.MULTILINE | re.DOTALL,
+          )
+          match = pattern.search(changelog)
+          if match:
+              notes = match.group(0).strip()
+
+          output_path = Path(os.environ["GITHUB_OUTPUT"])
+          with output_path.open("a", encoding="utf-8") as output:
+              print(f"version={version}", file=output)
+              print(f"name={name}", file=output)
+              print("notes<<__EOF__", file=output)
+              print(notes, file=output)
+              print("__EOF__", file=output)
+          PY
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.release.outputs.version }}
+          NAME: ${{ steps.release.outputs.name }}
+          NOTES: ${{ steps.release.outputs.notes }}
+        run: |
+          set -euo pipefail
+
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            gh release edit "$VERSION" \
+              --title "${NAME} ${VERSION}" \
+              --notes "$NOTES" \
+              --latest
+          else
+            gh release create "$VERSION" \
+              --target "$GITHUB_SHA" \
+              --title "${NAME} ${VERSION}" \
+              --notes "$NOTES" \
+              --latest
+          fi

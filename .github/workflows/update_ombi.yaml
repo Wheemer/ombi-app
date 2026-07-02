@@ -12,6 +12,7 @@ jobs:
     if: ${{ github.repository_owner == 'Wheemer' }}
     runs-on: ubuntu-latest
     permissions:
+      actions: write
       contents: write
     steps:
       - name: Checkout repo
@@ -48,3 +49,4 @@ jobs:
           git add ombi/config.yaml ombi/updater.json ombi/CHANGELOG.md
           git commit -m "Update Ombi to ${version}"
           git push
+          gh workflow run onpush_builder.yaml --ref master -f addon=ombi

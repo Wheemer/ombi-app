@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.60.9 (2026-07-07)
+
+- Updated Ombi upstream version to `4.60.9`.
+
 ## 4.60.8 (2026-07-03)
 
 - Updated Ombi upstream version to `4.60.8`.

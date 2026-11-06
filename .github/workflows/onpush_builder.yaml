@@ -384,7 +384,7 @@ jobs:
           container-registry-password: ${{ secrets.GITHUB_TOKEN }}
 
   publish_release:
-    if: ${{ needs.detect-changed-addons.outputs.changedAddons != '' && needs.detect-changed-addons.outputs.changedAddons != '[]' }}
+    if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/ombi-candidate/') }}
     needs: [detect-changed-addons, publish_manifest]
     runs-on: ubuntu-latest
     permissions:
@@ -447,6 +447,12 @@ jobs:
         run: |
           set -euo pipefail
 
+          if [[ "$GITHUB_REF" == refs/heads/ombi-candidate/* ]]; then
+            docker buildx imagetools inspect "ghcr.io/wheemer/ombi-app:$VERSION"
+            # A normal push rejects promotion if master moved during the build.
+            git push origin "$GITHUB_SHA:refs/heads/master"
+          fi
+
           if gh release view "$VERSION" >/dev/null 2>&1; then
             gh release edit "$VERSION" \
               --title "${NAME} ${VERSION}" \
@@ -458,4 +464,8 @@ jobs:
               --title "${NAME} ${VERSION}" \
               --notes "$NOTES" \
               --latest
+          fi
+
+          if [[ "$GITHUB_REF" == refs/heads/ombi-candidate/* ]]; then
+            git push origin --delete "${GITHUB_REF#refs/heads/}"
           fi

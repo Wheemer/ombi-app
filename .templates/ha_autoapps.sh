@@ -62,25 +62,6 @@ EOF2
 }
 
 restore_apt_sources_if_missing
-rm -f /ERROR
-
-# Install bash if needed
-if ! command -v bash > /dev/null 2> /dev/null; then
-    (apt-get update && apt-get install -yqq --no-install-recommends bash || apk add --no-cache bash) > /dev/null
-fi
-
-# Install curl if needed
-if ! command -v curl > /dev/null 2> /dev/null; then
-    (apt-get update && apt-get install -yqq --no-install-recommends curl || apk add --no-cache curl) > /dev/null
-fi
-
-# Call apps installer script if needed
-if [ ! -f /ha_automatic_packages.sh ]; then
-    echo "Error: /ha_automatic_packages.sh is missing from the build context" >&2
-    exit 1
-fi
-chmod 755 /ha_automatic_packages.sh
-eval /./ha_automatic_packages.sh "${PACKAGES:-}"
-
-# Clean
-rm -f /ha_automatic_packages.sh
+apt-get update -o APT::Update::Error-Mode=any
+apt-get install -y --no-install-recommends jq curl nginx
+rm -rf /var/lib/apt/lists/*

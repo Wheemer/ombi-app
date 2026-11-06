@@ -34,13 +34,8 @@ RUN find . -type f \( -name "*.sh" -o -name "run" -o -name "finish" \) -print -e
 RUN if [ ! -f /bin/sh ] && [ -f /usr/bin/sh ]; then ln -s /usr/bin/sh /bin/sh; fi && \
     if [ ! -f /bin/bash ] && [ -f /usr/bin/bash ]; then ln -s /usr/bin/bash /bin/bash; fi
 
-# Manual apps
-ENV PACKAGES="jq curl nginx"
-
-# Automatic apps & bashio
-COPY ha_automatic_packages.sh /ha_automatic_packages.sh
 COPY ha_autoapps.sh /ha_autoapps.sh
-RUN chmod 744 /ha_autoapps.sh /ha_automatic_packages.sh && /ha_autoapps.sh "$PACKAGES" && rm /ha_autoapps.sh
+RUN sh /ha_autoapps.sh && rm /ha_autoapps.sh
 
 ################
 # 4 Entrypoint #

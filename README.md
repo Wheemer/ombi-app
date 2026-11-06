@@ -32,6 +32,8 @@ For Home Assistant App issues, use this repository:
 
 [https://github.com/Wheemer/ombi-app/issues](https://github.com/Wheemer/ombi-app/issues)
 
+See [Contributing](CONTRIBUTING.md) for pull requests and testing requirements.
+
 # Features
 
 * Lets your users request movies, TV shows, and music from a clean web interface.

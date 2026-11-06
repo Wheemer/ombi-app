@@ -37,7 +37,7 @@ def version_key(version: str) -> tuple[int, ...]:
 
 
 def normalize_version(tag: str) -> str | None:
-    match = re.search(r"v?(\d+\.\d+\.\d+)", tag)
+    match = re.fullmatch(r"v?([0-9]+\.[0-9]+\.[0-9]+)", tag)
     return match.group(1) if match else None
 
 

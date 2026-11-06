@@ -89,7 +89,7 @@ jobs:
     name: Validate Ombi candidate
     if: ${{ needs.detect-changed-addons.outputs.changedAddons != '' && needs.detect-changed-addons.outputs.changedAddons != '[]' }}
     needs: [detect-changed-addons, prebuild-sanitize]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -98,7 +98,12 @@ jobs:
         uses: frenck/action-addon-linter@d51677290aef26cdfc835271dd3c7343ce502809 # v2
         with:
           path: ./ombi
-      - run: python3 -m py_compile scripts/update_ombi.py
+      - name: Fuzz upstream release tags
+        run: |
+          python3.12 -m venv "$RUNNER_TEMP/ombi-fuzz"
+          "$RUNNER_TEMP/ombi-fuzz/bin/python" -m pip install --require-hashes \
+            --only-binary=:all: -r .github/requirements.txt -r .github/fuzz-requirements.txt
+          "$RUNNER_TEMP/ombi-fuzz/bin/python" scripts/fuzz_release_tags.py -runs=20000 -max_len=256
       - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           base-ref: refs/heads/master

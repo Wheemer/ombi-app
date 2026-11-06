@@ -5,14 +5,15 @@ on:
     workflows: [PR validation]
     types: [completed]
 
-permissions:
-  contents: write
-  pull-requests: write
+permissions: {}
 
 jobs:
   merge:
     if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
     steps:
       - name: Merge the validated Dependabot commit
         env:

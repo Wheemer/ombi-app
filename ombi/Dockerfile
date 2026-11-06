@@ -2,7 +2,7 @@
 # 1 Build Image #
 #################
 
-ARG BUILD_FROM=lscr.io/linuxserver/ombi:amd64-development
+ARG BUILD_FROM=ghcr.io/linuxserver/ombi:development-v4.60.18-ls482@sha256:2066e100e84bbc7120c05e1aa47b9b4ef4897c910df07f7d510416927aefb3cc
 ARG BUILD_VERSION
 FROM ${BUILD_FROM}
 

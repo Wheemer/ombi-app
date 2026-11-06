@@ -86,18 +86,23 @@ jobs:
         uses: ymwymw/check-mixed-line-endings@8bb313fe0d51144268ee1ffdd66cf130130fc0e7 # v2
 
   lint_config:
+    name: Validate Ombi
     if: ${{ needs.detect-changed-addons.outputs.changedAddons != '' && needs.detect-changed-addons.outputs.changedAddons != '[]' }}
     needs: [detect-changed-addons, prebuild-sanitize]
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        addon: ${{ fromJSON(needs.detect-changed-addons.outputs.changedAddons) }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - name: Run Home Assistant Add-on Lint
         uses: frenck/action-addon-linter@d51677290aef26cdfc835271dd3c7343ce502809 # v2
         with:
-          path: "./${{ matrix.addon }}"
+          path: ./ombi
+      - run: python3 -m py_compile scripts/update_ombi.py
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          base-ref: refs/heads/master
+          head-ref: ${{ github.sha }}
 
   build:
     if: ${{ needs.detect-changed-addons.outputs.changedAddons != '' && needs.detect-changed-addons.outputs.changedAddons != '[]' }}
@@ -150,14 +155,16 @@ jobs:
           TEMPLATES_DIR=".templates"
           ADDON_DIR="./$ADDON"
 
-          for script in ha_autoapps.sh ha_automatic_packages.sh ha_entrypoint.sh bashio-standalone.sh ha_lsio.sh; do
+          for script in ha_autoapps.sh ha_entrypoint.sh bashio-standalone.sh ha_lsio.sh; do
             if [ -f "$TEMPLATES_DIR/$script" ]; then
               cp "$TEMPLATES_DIR/$script" "$ADDON_DIR/$script"
             fi
           done
 
       - name: Install PyYAML
-        run: python3 -m pip install --disable-pip-version-check pyyaml
+        run: >-
+          python3 -m pip install --require-hashes --only-binary=:all:
+          -r .github/requirements.txt
 
       - name: Read add-on metadata
         id: info
@@ -223,6 +230,9 @@ jobs:
           description = str(config.get("description") or "").strip()
           url = str(config.get("url") or "").strip()
           build_from = str(build_from_map.get(arch) or "").strip()
+          if build_from:
+              digest = (addon_dir / "base-image.digest").read_text(encoding="utf-8").strip()
+              build_from = f"{build_from}@{digest}"
           build_date = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
           dockerfile = addon_dir / f"Dockerfile.{arch}"
@@ -300,14 +310,14 @@ jobs:
             ${{ steps.info.outputs.version }}
             latest
           version: ${{ steps.info.outputs.version }}
-          push: "true"
+          push: ${{ (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/ombi-candidate/')) && 'true' || 'false' }}
           cosign: "false"
           container-registry-password: ${{ secrets.GITHUB_TOKEN }}
           labels: ${{ steps.info.outputs.labels }}
           build-args: ${{ steps.info.outputs.build_args }}
 
   publish_manifest:
-    if: ${{ needs.detect-changed-addons.outputs.changedAddons != '' && needs.detect-changed-addons.outputs.changedAddons != '[]' }}
+    if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/ombi-candidate/') }}
     needs: [detect-changed-addons, build]
     runs-on: ubuntu-latest
     permissions:
@@ -320,7 +330,9 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Install PyYAML
-        run: python3 -m pip install --disable-pip-version-check pyyaml
+        run: >-
+          python3 -m pip install --require-hashes --only-binary=:all:
+          -r .github/requirements.txt
 
       - name: Read manifest metadata
         id: manifest
@@ -381,7 +393,9 @@ jobs:
           fetch-depth: 0
 
       - name: Install PyYAML
-        run: python3 -m pip install --disable-pip-version-check pyyaml
+        run: >-
+          python3 -m pip install --require-hashes --only-binary=:all:
+          -r .github/requirements.txt
 
       - name: Read release metadata
         id: release

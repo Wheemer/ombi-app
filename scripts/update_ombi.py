@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import hashlib
 import json
 import os
 import re
@@ -15,6 +16,7 @@ CONFIG_PATH = ADDON_DIR / "config.yaml"
 CHANGELOG_PATH = ADDON_DIR / "CHANGELOG.md"
 UPDATER_PATH = ADDON_DIR / "updater.json"
 BUILD_PATH = ADDON_DIR / "build.json"
+BASE_DIGEST_PATH = ADDON_DIR / "base-image.digest"
 
 
 class HomeAssistantDumper(yaml.SafeDumper):
@@ -71,6 +73,40 @@ def latest_ombi_version(include_prerelease: bool) -> str:
     return max(versions, key=version_key)
 
 
+def resolve_base_image(tag: str) -> str:
+    registry = "https://ghcr.io"
+    repository = "linuxserver/ombi"
+    with urllib.request.urlopen(
+        f"{registry}/token?service=ghcr.io&scope=repository:{repository}:pull",
+        timeout=30,
+    ) as response:
+        token = json.load(response)["token"]
+
+    request = urllib.request.Request(
+        f"{registry}/v2/{repository}/manifests/{tag}",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": (
+                "application/vnd.oci.image.index.v1+json, "
+                "application/vnd.docker.distribution.manifest.list.v2+json"
+            ),
+        },
+    )
+    with urllib.request.urlopen(request, timeout=30) as response:
+        manifest = response.read()
+        digest = f"sha256:{hashlib.sha256(manifest).hexdigest()}"
+        if digest != response.headers.get("Docker-Content-Digest"):
+            raise RuntimeError(f"LinuxServer image digest mismatch for {tag}")
+
+    platforms = {
+        (entry["platform"]["os"], entry["platform"]["architecture"])
+        for entry in json.loads(manifest)["manifests"]
+    }
+    if not {("linux", "amd64"), ("linux", "arm64")} <= platforms:
+        raise RuntimeError(f"LinuxServer image {tag} must support amd64 and arm64")
+    return f"ghcr.io/{repository}:{tag}@{digest}"
+
+
 def prepend_changelog(addon_version: str, upstream_version: str) -> None:
     today = datetime.now(timezone.utc).date().isoformat()
     existing = CHANGELOG_PATH.read_text(encoding="utf-8")
@@ -114,10 +150,13 @@ def main() -> int:
         return 0
 
     base_tag = max(matching_tags, key=lambda match: int(match[1]))[0]
+    base_image = resolve_base_image(base_tag)
+    base_ref, digest = base_image.rsplit("@", 1)
     build = json.loads(BUILD_PATH.read_text(encoding="utf-8"))
     for arch in build["build_from"]:
-        build["build_from"][arch] = f"lscr.io/linuxserver/ombi:{base_tag}"
+        build["build_from"][arch] = base_ref
     BUILD_PATH.write_text(json.dumps(build, indent=4) + "\n", encoding="utf-8")
+    BASE_DIGEST_PATH.write_text(digest + "\n", encoding="utf-8")
 
     config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
     addon_version = latest_upstream

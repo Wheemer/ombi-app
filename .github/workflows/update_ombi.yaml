@@ -24,7 +24,9 @@ jobs:
           fetch-depth: 0
 
       - name: Install PyYAML
-        run: python3 -m pip install --disable-pip-version-check pyyaml
+        run: >-
+          python3 -m pip install --require-hashes --only-binary=:all:
+          -r .github/requirements.txt
 
       - name: Check Ombi release
         env:
@@ -43,7 +45,7 @@ jobs:
             exit 0
           fi
 
-          if git diff --quiet -- ombi/build.json ombi/config.yaml ombi/updater.json ombi/CHANGELOG.md; then
+          if git diff --quiet -- ombi/base-image.digest ombi/build.json ombi/config.yaml ombi/updater.json ombi/CHANGELOG.md; then
             echo "No Ombi update found."
             exit 0
           fi
@@ -57,7 +59,7 @@ jobs:
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add ombi/build.json ombi/config.yaml ombi/updater.json ombi/CHANGELOG.md
+          git add ombi/base-image.digest ombi/build.json ombi/config.yaml ombi/updater.json ombi/CHANGELOG.md
           git commit -m "Update Ombi to ${version}"
           candidate="ombi-candidate/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           git push origin "HEAD:refs/heads/$candidate"

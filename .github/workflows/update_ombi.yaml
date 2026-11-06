@@ -7,6 +7,8 @@ on:
   schedule:
     - cron: "17 8 * * *"
 
+permissions: {}
+
 jobs:
   update:
     if: ${{ github.repository_owner == 'Wheemer' }}
@@ -17,7 +19,7 @@ jobs:
       pull-requests: read
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
 

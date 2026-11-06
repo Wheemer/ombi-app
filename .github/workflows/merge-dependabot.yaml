@@ -1,0 +1,28 @@
+name: Merge validated Dependabot updates
+
+on:
+  workflow_run:
+    workflows: [PR validation]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  merge:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Merge the validated Dependabot commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VALIDATED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          pr=$(gh pr list -R "$GITHUB_REPOSITORY" --base master --author 'app/dependabot' \
+            --json number,headRefOid,isDraft \
+            --jq ".[] | select(.headRefOid == \"$VALIDATED_SHA\" and (.isDraft | not)) | .number")
+          if [[ -n "$pr" ]]; then
+            gh pr merge "$pr" -R "$GITHUB_REPOSITORY" --squash --match-head-commit "$VALIDATED_SHA"
+          fi

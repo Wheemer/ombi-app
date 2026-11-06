@@ -14,6 +14,7 @@ ADDON_DIR = ROOT / "ombi"
 CONFIG_PATH = ADDON_DIR / "config.yaml"
 CHANGELOG_PATH = ADDON_DIR / "CHANGELOG.md"
 UPDATER_PATH = ADDON_DIR / "updater.json"
+BUILD_PATH = ADDON_DIR / "build.json"
 
 
 class HomeAssistantDumper(yaml.SafeDumper):
@@ -97,6 +98,26 @@ def main() -> int:
     if version_key(latest_upstream) <= version_key(current_upstream):
         print(f"Ombi is current: {current_upstream}")
         return 0
+
+    base_tags = github_json("repos/linuxserver/docker-ombi/releases?per_page=100")
+    matching_tags = [
+        match
+        for release in base_tags
+        if not release.get("draft")
+        and (match := re.fullmatch(
+            rf"(?:development-)?v{re.escape(latest_upstream)}-ls(\d+)",
+            release["tag_name"],
+        ))
+    ]
+    if not matching_tags:
+        print(f"Waiting for LinuxServer to publish Ombi {latest_upstream}")
+        return 0
+
+    base_tag = max(matching_tags, key=lambda match: int(match[1]))[0]
+    build = json.loads(BUILD_PATH.read_text(encoding="utf-8"))
+    for arch in build["build_from"]:
+        build["build_from"][arch] = f"lscr.io/linuxserver/ombi:{base_tag}"
+    BUILD_PATH.write_text(json.dumps(build, indent=4) + "\n", encoding="utf-8")
 
     config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
     addon_version = latest_upstream

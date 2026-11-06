@@ -11,15 +11,6 @@ on:
         required: true
         default: ombi
         type: string
-  push:
-    branches:
-      - master
-    paths:
-      - ".github/workflows/onpush_builder.yaml"
-      - ".templates/**"
-      - "ombi/**"
-      - "repository.yaml"
-      - "scripts/**"
 
 jobs:
   detect-changed-addons:
@@ -389,11 +380,14 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: read
     strategy:
       matrix:
         addon: ${{ fromJSON(needs.detect-changed-addons.outputs.changedAddons) }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install PyYAML
         run: python3 -m pip install --disable-pip-version-check pyyaml
@@ -449,6 +443,11 @@ jobs:
 
           if [[ "$GITHUB_REF" == refs/heads/ombi-candidate/* ]]; then
             docker buildx imagetools inspect "ghcr.io/wheemer/ombi-app:$VERSION"
+            pending=$(gh pr list --base master --author app/dependabot --json number --jq '.[].number')
+            if [[ -n "$pending" ]]; then
+              echo "Dependabot updates must merge before publishing Ombi."
+              exit 1
+            fi
             # A normal push rejects promotion if master moved during the build.
             git push origin "$GITHUB_SHA:refs/heads/master"
           fi

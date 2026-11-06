@@ -1,6 +1,6 @@
 {
     "build_from": {
-        "aarch64": "lscr.io/linuxserver/ombi:arm64v8-development",
-        "amd64": "lscr.io/linuxserver/ombi:amd64-development"
+        "aarch64": "lscr.io/linuxserver/ombi:development-v4.60.18-ls482",
+        "amd64": "lscr.io/linuxserver/ombi:development-v4.60.18-ls482"
     }
 }

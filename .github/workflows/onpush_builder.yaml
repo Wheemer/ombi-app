@@ -86,7 +86,7 @@ jobs:
         uses: ymwymw/check-mixed-line-endings@8bb313fe0d51144268ee1ffdd66cf130130fc0e7 # v2
 
   lint_config:
-    name: Validate Ombi
+    name: Validate Ombi candidate
     if: ${{ needs.detect-changed-addons.outputs.changedAddons != '' && needs.detect-changed-addons.outputs.changedAddons != '[]' }}
     needs: [detect-changed-addons, prebuild-sanitize]
     runs-on: ubuntu-latest
@@ -377,9 +377,27 @@ jobs:
           cosign: "false"
           container-registry-password: ${{ secrets.GITHUB_TOKEN }}
 
+  certify_candidate:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+    steps:
+      - name: Report successful candidate validation to branch protection
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method POST "repos/$GITHUB_REPOSITORY/check-runs" \
+            -f name='Validate Ombi' \
+            -f head_sha="$GITHUB_SHA" \
+            -f status=completed \
+            -f conclusion=success \
+            -f details_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --jq '.html_url'
+
   publish_release:
     if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/ombi-candidate/') }}
-    needs: [detect-changed-addons, publish_manifest]
+    needs: [detect-changed-addons, publish_manifest, certify_candidate]
     runs-on: ubuntu-latest
     permissions:
       contents: write

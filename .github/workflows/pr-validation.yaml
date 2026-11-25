@@ -18,6 +18,16 @@ jobs:
       - uses: frenck/action-addon-linter@d51677290aef26cdfc835271dd3c7343ce502809 # v2
         with:
           path: ./ombi
+      - name: Build and smoke-test the app
+        run: |
+          set -euo pipefail
+          cp .templates/*.sh ombi/
+          base_image=$(jq -er '.build_from.amd64' ombi/build.json)
+          base_digest=$(<ombi/base-image.digest)
+          docker build --build-arg "BUILD_FROM=$base_image@$base_digest" \
+            --build-arg "BUILD_VERSION=$(yq -r .version ombi/config.yaml)" \
+            --tag ombi:pr-smoke ombi
+          bash scripts/smoke_ombi_startup.sh ombi:pr-smoke
       - name: Fuzz upstream release tags
         run: |
           python3.12 -m venv "$RUNNER_TEMP/ombi-fuzz"

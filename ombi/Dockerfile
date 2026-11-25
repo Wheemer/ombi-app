@@ -46,7 +46,18 @@ ENV S6_STAGE2_HOOK=/ha_entrypoint.sh
 COPY ha_entrypoint.sh /ha_entrypoint.sh
 RUN chmod 777 /ha_entrypoint.sh
 
-# Install bashio
+# LinuxServer does not ship Bashio, but both the HA init scripts and the
+# LinuxServer user initialization modified by ha_lsio.sh execute it.
+RUN curl -fsSL -o /tmp/bashio.tar.gz \
+        https://codeload.github.com/hassio-addons/bashio/tar.gz/f788a0b8e944c5fed623225fe37af8dda97ac2f2 \
+    && echo '2218bca08a9c1ff3e310082bae9ff2a3572ae1f9af9b7a86b4a6e8a13d60684c  /tmp/bashio.tar.gz' | sha256sum -c - \
+    && mkdir -p /usr/lib/bashio \
+    && tar -xzf /tmp/bashio.tar.gz -C /usr/lib/bashio --strip-components=2 \
+        bashio-f788a0b8e944c5fed623225fe37af8dda97ac2f2/lib \
+    && ln -s /usr/lib/bashio/bashio /usr/bin/bashio \
+    && rm /tmp/bashio.tar.gz
+
+# Keep the standalone fallback for the entrypoint's probes.
 COPY bashio-standalone.sh /usr/local/lib/bashio-standalone.sh
 RUN chmod 0755 /usr/local/lib/bashio-standalone.sh
 
